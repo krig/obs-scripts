@@ -1,0 +1,210 @@
+#!/usr/bin/env python
+#
+# helper utility for using the open build service
+# to build test packages from a source repository
+# makes many assumptions, needs to be documented
+
+import os
+import sys
+import subprocess
+import argparse
+from ConfigParser import RawConfigParser
+
+VARIANTS = {}
+VERBOSE = False
+
+variant_defaults = {
+    "cmd": "osc",
+    "arch": "x86_64",
+    "bsbase": "$HOME/build-service",
+    "buildroot": "/opt/build",
+    "root": "%(buildroot)s/%(repo)s",
+    "buildservice": "%(bsbase)s/obs/%(branch)s"
+}
+
+
+def init_variants():
+    parser = RawConfigParser(variant_defaults)
+    parser.read([os.path.expanduser('~/.obs.conf'),
+                 os.path.expanduser('~/.local/config/obs.conf'),
+                 os.path.expanduser('~/bin/obs.conf')])
+    for section in parser.sections():
+        variant = {}
+        variant.update(variant_defaults)
+        variant.update(parser.items(section))
+        for k, v in variant.iteritems():
+            variant[k] = os.path.expandvars(v % variant)
+        VARIANTS[section] = variant
+
+
+def do_call(cmd, dryrun):
+    if VERBOSE:
+        print " ".join(cmd)
+    if not dryrun:
+        subprocess.call(cmd)
+
+
+def bsname(bdir):
+    here = os.path.basename(os.getcwd())
+    out = "pacemaker"
+    if here == "glue":
+        out = "cluster-glue"
+    elif os.path.isdir(os.path.join(bdir, here)):
+        out = here
+    else:
+        raise NotImplementedError("Build service directory not found: %s" % (bdir))
+    if VERBOSE:
+        print "bsname:", out
+    return out
+
+
+def mkarchive(where, dryrun):
+    prefix = os.path.splitext(os.path.basename(where))[0]
+    if prefix.lower().endswith('.tar'):
+        prefix = os.path.splitext(prefix)[0]
+    if os.path.isdir('.git'):
+        gitcmd = ['git', 'archive',
+                  '--format=tar',
+                  '--prefix=%s/' % (prefix),
+                  'HEAD']
+        bz2cmd = ['bzip2']
+        if VERBOSE:
+            print " ".join(gitcmd) + " | " + " ".join(bz2cmd) + " > " + where
+        if not dryrun:
+            p3 = open(where, 'w')
+            p1 = subprocess.Popen(gitcmd, stdout=subprocess.PIPE)
+            p2 = subprocess.Popen(bz2cmd, stdin=p1.stdout, stdout=p3)
+            p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+            p2.communicate()
+            p3.close()
+    elif os.path.isdir('.hg'):
+        do_call(['hg', 'archive', '-t', 'tbz2', where], dryrun)
+    else:
+        raise IOError("not a git or mercurial repository: " + where)
+
+
+class Commands:
+    def __init__(self, args):
+        self.args = args
+        self.variant = VARIANTS[args.variant]
+        for k, v in self.variant.iteritems():
+            setattr(self, k, v)
+
+    def _setup_projname(self):
+        if not hasattr(self, 'projname'):
+            self._checkdir(self.buildservice)
+            self.projname = bsname(self.buildservice)
+
+    def _checkdir(self, d):
+        if not os.path.isdir(d):
+            raise IOError("Not a directory: " + d)
+
+    def variants(self):
+        for k, v in VARIANTS.iteritems():
+            print '[%s]' % (k)
+            for kk, vv in v.iteritems():
+                print "%15s = %s" % (kk, vv)
+            print
+
+    def archive(self):
+        self._setup_projname()
+        d = os.path.join(self.buildservice, self.projname)
+        self._checkdir(d)
+        mkarchive(os.path.join(d, self.projname + ".tar.bz2"), self.args.dryrun)
+
+    def cd_prj(self):
+        self._setup_projname()
+        path = os.path.join(self.buildservice, self.projname)
+        if VERBOSE:
+            print "chdir", path
+        if not self.args.dryrun:
+            os.chdir(path)
+
+    def build(self):
+        self._setup_projname()
+        self._create_root()
+        cl = self.cmd.split()
+        cl += ['build', '-d', '--no-verify', '--release=1']
+        if self.args.localpkg:
+            cl += ['--local-package']
+        if self.args.tests:
+            cl += ['--define', "with_regression_tests 1"]
+        cl += ['--root='+self.root]
+        cl += [self.repo, self.arch]
+        cl += ["%s.spec" % (self.projname)]
+        do_call(cl, self.args.dryrun)
+
+    def run(self):
+        self.clean()
+        self.archive()
+        self.cd_prj()
+        self.build()
+
+    def test(self):
+        self.args.tests = True
+        self.clean()
+        self.archive()
+        self.cd_prj()
+        self.build()
+
+    def help(self):
+        pass
+
+    def _create_root(self):
+        if not os.path.isdir(self.root):
+            do_call(['sudo', 'mkdir', '-p', self.root], self.args.dryrun)
+
+    def clean(self):
+        if self.args.tests:
+            fn = '%s/tmp/.crmsh_regression_tests_ran' % (self.root)
+            if os.path.isfile(fn):
+                do_call(['sudo', 'rm', fn], self.args.dryrun)
+
+
+def main():
+    init_variants()
+
+    def ls_commands():
+        return [x for x in sorted(dir(Commands)) if not x.startswith('_')]
+
+    parser = argparse.ArgumentParser(
+        description="Helper utility for the open build service",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-t', '--tests', dest='tests', action='store_true',
+                        help="Enable regression tests")
+    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true',
+                        help="Verbose output")
+    parser.add_argument('-n', '--dry-run', dest='dryrun', action='store_true',
+                        help='only print result of command')
+    parser.add_argument('-d', '--dir', metavar='dir', type=str, default=".",
+                        help='source directory')
+    parser.add_argument('--local-package', dest='localpkg', action='store_true',
+                        help='Pass flag --local-package to osc')
+    parser.add_argument('cmd', metavar='cmd', type=str, default="",
+                        help='|'.join(ls_commands()))
+    parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
+                        help='build variant')
+    args = parser.parse_args()
+
+    global VERBOSE
+    VERBOSE = args.verbose or args.dryrun
+
+    try:
+        commands = Commands(args)
+        if args.cmd == "help":
+            parser.print_help()
+        elif args.cmd in ls_commands():
+            getattr(commands, args.cmd)()
+        else:
+            print >>sys.stderr, "Unknown command ", args.cmd
+            parser.print_help()
+    except Exception, e:
+        if VERBOSE:
+            import traceback
+            traceback.print_exc()
+        print >>sys.stderr, "Error:", e
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
+
