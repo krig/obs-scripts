@@ -29,22 +29,22 @@ To build packages for the project `crmsh` from `network:ha-clustering:Factory`:
 
 1. Check out `crmsh` from OBS to `~/build-service/obs/network:ha-clustering:Factory/crmsh`:
 
-    cd ~/build-service/obs
-    osc co network:ha-clustering:Factory crmsh
+        cd ~/build-service/obs
+        osc co network:ha-clustering:Factory crmsh
 
 2. Check out the `crmsh` source code from mercurial:
 
-    cd ~/src
-    hg clone http://hg.savannah.nongnu.org/hgweb/crmsh/
+        cd ~/src
+        hg clone http://hg.savannah.nongnu.org/hgweb/crmsh/
 
 4. Add a target definition to `obs.conf`:
 
-    [crmsh]
-    branch=network:ha-clustering:Factory
-    repo=openSUSE_Factory
+        [crmsh]
+        branch=network:ha-clustering:Factory
+        repo=openSUSE_Factory
 
 3. Run the `obs` tool from the `crmsh` source directory:
 
-    cd ~/src/crmsh
-    obs run crmsh
+        cd ~/src/crmsh
+        obs run crmsh
 
