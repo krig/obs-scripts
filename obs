@@ -2,9 +2,10 @@
 #
 # helper utility for using the open build service
 # to build test packages from a source repository
-# makes many assumptions, needs to be documented
+# makes many assumptions
 
 import os
+import re
 import sys
 import subprocess
 import argparse
@@ -17,10 +18,28 @@ variant_defaults = {
     "cmd": "osc",
     "arch": "x86_64",
     "bsbase": "$HOME/build-service",
-    "buildroot": "/opt/build",
+    "buildroot": "/srv/buildroot",
     "root": "%(buildroot)s/%(repo)s",
     "buildservice": "%(bsbase)s/obs/%(branch)s"
 }
+
+
+def resolve_archive_name(projdir, projname):
+    specfilename = os.path.join(projdir, "%s.spec" % (projname))
+    if os.path.isfile(specfilename):
+        ver_re = re.compile(r"Version:\s*(.+)")
+        src_re = re.compile(r"Source[0]?:\s*(.+)")
+        lines = open(specfilename).readlines()
+        verl = [ver_re.match(l).group(1).strip() for l in lines if ver_re.match(l)]
+        srcl = [src_re.match(l).group(1).strip() for l in lines if src_re.match(l)]
+        if verl and srcl:
+            verl = verl[0]
+            srcl = srcl[0]
+            srcl = srcl.replace("%{name}", projname)
+            srcl = srcl.replace("%{version}", verl)
+            return srcl
+    else:
+        return "%s.tar.bz2" % (projname)
 
 
 def init_variants():
@@ -49,17 +68,22 @@ def bsname(bdir):
     out = "pacemaker"
     if here == "glue":
         out = "cluster-glue"
+    elif here == "crmsh-dev":
+        out = "crmsh"
     elif os.path.isdir(os.path.join(bdir, here)):
         out = here
     else:
-        raise NotImplementedError("Build service directory not found: %s" % (bdir))
+        out = here
+        #return "pacemaker"
     if VERBOSE:
         print "bsname:", out
     return out
 
 
-def mkarchive(where, dryrun):
-    prefix = os.path.splitext(os.path.basename(where))[0]
+def mkarchive(projdir, projname, dryrun):
+    archivename = resolve_archive_name(projdir, projname)
+    where = os.path.join(projdir, archivename)
+    prefix, ext = os.path.splitext(archivename)
     if prefix.lower().endswith('.tar'):
         prefix = os.path.splitext(prefix)[0]
     if os.path.isdir('.git'):
@@ -67,18 +91,30 @@ def mkarchive(where, dryrun):
                   '--format=tar',
                   '--prefix=%s/' % (prefix),
                   'HEAD']
-        bz2cmd = ['bzip2']
+        if ext in ['.bz2', '.tbz']:
+            zipcmd = ['bzip2']
+        elif ext in ['.xz']:
+            zipcmd = ['xz']
+        elif ext in ['.gz', '.tgz']:
+            zipcmd = ['gzip']
+        else:
+            raise IOError("Unsupported compression: " + ext)
         if VERBOSE:
-            print " ".join(gitcmd) + " | " + " ".join(bz2cmd) + " > " + where
+            print " ".join(gitcmd) + " | " + " ".join(zipcmd) + " > " + where
         if not dryrun:
             p3 = open(where, 'w')
             p1 = subprocess.Popen(gitcmd, stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(bz2cmd, stdin=p1.stdout, stdout=p3)
+            p2 = subprocess.Popen(zipcmd, stdin=p1.stdout, stdout=p3)
             p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
             p2.communicate()
             p3.close()
     elif os.path.isdir('.hg'):
-        do_call(['hg', 'archive', '-t', 'tbz2', where], dryrun)
+        if ext in ['.bz2', '.tbz']:
+            do_call(['hg', 'archive', '-t', 'tbz2', where], dryrun)
+        elif ext in ['.gz', '.tgz']:
+            do_call(['hg', 'archive', '-t', 'tgz', where], dryrun)
+        else:
+            raise IOError("Unsupported compression: " + ext)
     else:
         raise IOError("not a git or mercurial repository: " + where)
 
@@ -89,6 +125,8 @@ class Commands:
         self.variant = VARIANTS[args.variant]
         for k, v in self.variant.iteritems():
             setattr(self, k, v)
+        if args.projname:
+            self.projname = args.projname
 
     def _setup_projname(self):
         if not hasattr(self, 'projname'):
@@ -110,13 +148,14 @@ class Commands:
         self._setup_projname()
         d = os.path.join(self.buildservice, self.projname)
         self._checkdir(d)
-        mkarchive(os.path.join(d, self.projname + ".tar.bz2"), self.args.dryrun)
+        mkarchive(d, self.projname, self.args.dryrun)
 
     def cd_prj(self):
         self._setup_projname()
         path = os.path.join(self.buildservice, self.projname)
+        self._checkdir(path)
         if VERBOSE:
-            print "chdir", path
+            print "cd", path
         if not self.args.dryrun:
             os.chdir(path)
 
@@ -180,6 +219,8 @@ def main():
                         help='source directory')
     parser.add_argument('--local-package', dest='localpkg', action='store_true',
                         help='Pass flag --local-package to osc')
+    parser.add_argument('-p', '--projname', dest='projname',
+                        help='Override project name')
     parser.add_argument('cmd', metavar='cmd', type=str, default="",
                         help='|'.join(ls_commands()))
     parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
