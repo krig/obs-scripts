@@ -9,6 +9,7 @@ import re
 import sys
 import subprocess
 import argparse
+import tempfile
 from ConfigParser import RawConfigParser
 
 VARIANTS = {}
@@ -80,17 +81,34 @@ def bsname(bdir):
     return out
 
 
-def mkarchive(projdir, projname, dryrun):
+def pipe_to(cmd, filename, dryrun):
+    if VERBOSE:
+        print " ".join(cmd) + " > " + filename
+    if not dryrun:
+        p2 = open(filename, 'w')
+        p1 = subprocess.Popen(cmd, stdout=p2)
+        p1.communicate()
+        p2.close()
+
+
+def make_gitinfo(tmpdir, prefix, dryrun):
+    if VERBOSE:
+        print "mkdir " % (os.path.join(tmpdir, prefix))
+    if not dryrun:
+        os.mkdir(os.path.join(tmpdir, prefix))
+    filename = os.path.join(tmpdir, prefix, '.git_info')
+    pipe_to(['git', 'describe', '--tags', '--always'],
+            filename, dryrun)
+    return filename
+
+
+def mkarchive(projdir, projname, dryrun=False, gitinfo=False):
     archivename = resolve_archive_name(projdir, projname)
     where = os.path.join(projdir, archivename)
     prefix, ext = os.path.splitext(archivename)
     if prefix.lower().endswith('.tar'):
         prefix = os.path.splitext(prefix)[0]
     if os.path.isdir('.git'):
-        gitcmd = ['git', 'archive',
-                  '--format=tar',
-                  '--prefix=%s/' % (prefix),
-                  'HEAD']
         if ext in ['.bz2', '.tbz']:
             zipcmd = ['bzip2']
         elif ext in ['.xz']:
@@ -99,15 +117,17 @@ def mkarchive(projdir, projname, dryrun):
             zipcmd = ['gzip']
         else:
             raise IOError("Unsupported compression: " + ext)
-        if VERBOSE:
-            print " ".join(gitcmd) + " | " + " ".join(zipcmd) + " > " + where
+        tmpdir = '<tmpdir>'
         if not dryrun:
-            p3 = open(where, 'w')
-            p1 = subprocess.Popen(gitcmd, stdout=subprocess.PIPE)
-            p2 = subprocess.Popen(zipcmd, stdin=p1.stdout, stdout=p3)
-            p1.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-            p2.communicate()
-            p3.close()
+            tmpdir = tempfile.mkdtemp()
+        tarfile = os.path.join(tmpdir, prefix + '.tar')
+        do_call(['git', 'archive', '--format=tar', 'prefix=%s/' % (prefix),
+                 '-o', tarfile, 'HEAD'])
+        if gitinfo:
+            gitinfo_file = make_gitinfo(tmpdir, prefix, dryrun)
+            do_call(['tar', '-rf', tarfile, gitinfo_file])
+        zipcmd.append(tarfile)
+        pipe_to(zipcmd, where, dryrun)
     elif os.path.isdir('.hg'):
         if ext in ['.bz2', '.tbz']:
             do_call(['hg', 'archive', '-t', 'tbz2', where], dryrun)
@@ -148,7 +168,7 @@ class Commands:
         self._setup_projname()
         d = os.path.join(self.buildservice, self.projname)
         self._checkdir(d)
-        mkarchive(d, self.projname, self.args.dryrun)
+        mkarchive(d, self.projname, dryrun=self.args.dryrun, gitinfo=self.args.gitinfo)
 
     def cd_prj(self):
         self._setup_projname()
@@ -221,6 +241,8 @@ def main():
                         help='Start with cached prjconf and packages without contacting the api server')
     parser.add_argument('-d', '--dir', metavar='dir', type=str, default=".",
                         help='source directory')
+    parser.add_argument('-g', '--add-git-info', dest='gitinfo', action='store_true',
+                        help='Create a .git_info file and add it to the generated archive')
     parser.add_argument('--local-package', dest='localpkg', action='store_true',
                         help='Pass flag --local-package to osc')
     parser.add_argument('-p', '--projname', dest='projname',
