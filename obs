@@ -124,13 +124,17 @@ def mkarchive(projdir, projname, dryrun=False, gitinfo=False):
             tmpdir = tempfile.mkdtemp()
             atexit.register(lambda: shutil.rmtree(tmpdir, ignore_errors=True))
         tarfile = os.path.join(tmpdir, prefix + '.tar')
-        do_call(['git', 'archive', '--format=tar', 'prefix=%s/' % (prefix),
-                 '-o', tarfile, 'HEAD'])
+        do_call(['git', 'archive', '--format=tar', '--prefix=%s/' % (prefix),
+                 '-o', tarfile, 'HEAD'], dryrun)
         if gitinfo:
             gitinfo_file = make_gitinfo(tmpdir, prefix, dryrun)
-            do_call(['tar', '-rf', tarfile, gitinfo_file])
+            do_call(['tar', '-rf', tarfile, gitinfo_file], dryrun)
         zipcmd.append(tarfile)
-        pipe_to(zipcmd, where, dryrun)
+        do_call(zipcmd, dryrun)
+        if VERBOSE:
+            print "cp %s %s" % (tarfile + ext, where)
+        if not dryrun:
+            shutil.copyfile(tarfile + ext, where)
     elif os.path.isdir('.hg'):
         if ext in ['.bz2', '.tbz']:
             do_call(['hg', 'archive', '-t', 'tbz2', where], dryrun)
