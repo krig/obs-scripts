@@ -49,6 +49,7 @@ def resolve_archive_name(projdir, projname):
 def init_variants():
     parser = RawConfigParser(variant_defaults)
     parser.read([os.path.expanduser('~/.obs.conf'),
+                 os.path.expanduser('~/.config/obs-scripts/obs.conf'),
                  os.path.expanduser('~/.local/config/obs.conf'),
                  os.path.expanduser('~/bin/obs.conf')])
     for section in parser.sections():
@@ -72,8 +73,10 @@ def do_call(cmd):
     do(" ".join(cmd), subprocess.call, cmd)
 
 
-def bsname(bdir):
+def bsname(bdir, drop_pfx = None):
     here = os.path.basename(os.getcwd())
+    if drop_pfx and here.startswith(drop_pfx):
+        here = here.replace(drop_pfx, "")
     out = "pacemaker"
     if here == "glue":
         out = "cluster-glue"
@@ -166,7 +169,7 @@ class Commands:
     def _setup_projname(self):
         if not hasattr(self, 'projname'):
             self._checkdir(self.buildservice)
-            self.projname = bsname(self.buildservice)
+            self.projname = bsname(self.buildservice, self.github_fork_pfx)
 
     def _checkdir(self, d):
         if not os.path.isdir(d):
@@ -292,3 +295,4 @@ def main():
 if __name__ == "__main__":
     main()
 
+# vim:et:ts=4:
