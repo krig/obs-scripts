@@ -47,7 +47,7 @@ def resolve_archive_name(projdir, projname):
 
 
 def init_variants():
-    parser = RawConfigParser(variant_defaults)
+    parser = RawConfigParser()
     parser.read([os.path.expanduser('~/.obs.conf'),
                  os.path.expanduser('~/.config/obs-scripts/obs.conf'),
                  os.path.expanduser('~/.local/config/obs.conf'),
@@ -55,6 +55,8 @@ def init_variants():
     for section in parser.sections():
         variant = {}
         variant.update(variant_defaults)
+        if parser.has_section("defaults"):
+            variant.update(parser.items("defaults"))
         variant.update(parser.items(section))
         for k, v in variant.iteritems():
             variant[k] = os.path.expandvars(v % variant)
