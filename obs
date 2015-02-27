@@ -211,7 +211,7 @@ class Commands:
         self._checkdir(d)
         mkarchive(d, self.projname, gitinfo=self.args.gitinfo)
 
-    def cd_prj(self):
+    def _cd_prj(self):
         self._setup_projname()
         path = os.path.join(self.buildservice, self.projname)
         self._checkdir(path)
@@ -239,14 +239,14 @@ class Commands:
     def run(self):
         self.clean()
         self.archive()
-        self.cd_prj()
+        self._cd_prj()
         self.build()
 
     def test(self):
         self.args.tests = True
         self.clean()
         self.archive()
-        self.cd_prj()
+        self._cd_prj()
         self.build()
 
     def help(self):
