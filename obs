@@ -46,8 +46,8 @@ def resolve_archive_name(projdir, projname):
         return "%s.tar.bz2" % (projname)
 
 
-def init_variants():
-    parser = RawConfigParser(variant_defaults)
+def init_variants(obsbranch):
+    parser = RawConfigParser()
     parser.read([os.path.expanduser('~/.obs.conf'),
                  os.path.expanduser('~/.config/obs-scripts/obs.conf'),
                  os.path.expanduser('~/.local/config/obs.conf'),
@@ -55,7 +55,12 @@ def init_variants():
     for section in parser.sections():
         variant = {}
         variant.update(variant_defaults)
+        if parser.has_section("defaults"):
+            variant.update(parser.items("defaults"))
         variant.update(parser.items(section))
+        if obsbranch:
+            variant["branch"] = "home:%s:branches:%s" % \
+                (obs_username(variant["cmd"]), variant["branch"])
         for k, v in variant.iteritems():
             variant[k] = os.path.expandvars(v % variant)
         VARIANTS[section] = variant
@@ -90,6 +95,24 @@ def bsname(bdir, drop_pfx = None):
     if VERBOSE:
         print "bsname:", out
     return out
+
+
+def get_stdout(cmd):
+    p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    outp = p.communicate()[0]
+    return outp.strip()
+
+
+# perhaps load from/save to disk
+whois_cache = {}
+def obs_username(cmd):
+    try:
+        id = whois_cache[cmd]
+    except:
+        whois = get_stdout("%s whois" % cmd)
+        id = whois[0:whois.index(':')]
+        whois_cache[cmd] = id
+    return id
 
 
 def pipe_to(cmd, filename):
@@ -188,7 +211,7 @@ class Commands:
         self._checkdir(d)
         mkarchive(d, self.projname, gitinfo=self.args.gitinfo)
 
-    def cd_prj(self):
+    def _cd_prj(self):
         self._setup_projname()
         path = os.path.join(self.buildservice, self.projname)
         self._checkdir(path)
@@ -216,14 +239,14 @@ class Commands:
     def run(self):
         self.clean()
         self.archive()
-        self.cd_prj()
+        self._cd_prj()
         self.build()
 
     def test(self):
         self.args.tests = True
         self.clean()
         self.archive()
-        self.cd_prj()
+        self._cd_prj()
         self.build()
 
     def help(self):
@@ -241,8 +264,6 @@ class Commands:
 
 
 def main():
-    init_variants()
-
     def ls_commands():
         return [x for x in sorted(dir(Commands)) if not x.startswith('_')]
 
@@ -265,6 +286,8 @@ def main():
                         help='Pass flag --local-package to osc')
     parser.add_argument('-p', '--projname', dest='projname',
                         help='Override project name')
+    parser.add_argument('-b', '--branch', dest='obsbranch', action='store_true',
+                        help="Work on the OBS branch (home:USERNAME:branches)")
     parser.add_argument('cmd', metavar='cmd', type=str, default="",
                         help='|'.join(ls_commands()))
     parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
@@ -275,6 +298,8 @@ def main():
     VERBOSE = args.verbose or args.dryrun
     global DRYRUN
     DRYRUN = args.dryrun
+
+    init_variants(args.obsbranch)
 
     try:
         commands = Commands(args)
