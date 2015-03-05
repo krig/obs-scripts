@@ -24,7 +24,8 @@ variant_defaults = {
     "bsbase": "$HOME/build-service",
     "buildroot": "/srv/buildroot",
     "root": "%(buildroot)s/%(repo)s",
-    "buildservice": "%(bsbase)s/obs/%(branch)s"
+    "buildservice": "%(bsbase)s/obs/%(branch)s",
+    "github_fork_pfx": "krig:"
 }
 
 
