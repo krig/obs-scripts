@@ -72,11 +72,11 @@ def do(name, cmd, *args):
         print name
     if not DRYRUN:
         return cmd(*args)
-    return None
+    return True
 
 
 def do_call(cmd):
-    do(" ".join(cmd), subprocess.call, cmd)
+    return do(" ".join(cmd), subprocess.call, cmd)
 
 
 def bsname(bdir, drop_pfx = None):
@@ -235,7 +235,10 @@ class Commands:
         cl += ['--root='+self.root]
         cl += [self.repo, self.arch]
         cl += ["%s.spec" % (self.projname)]
-        do_call(cl)
+        if do_call(cl) == 0 and self.args.checkin:
+            cl = self.cmd.split()
+            cl += ['ci', '-m', self.args.msg or '"new version"']
+            do_call(cl)
 
     def run(self):
         self.clean()
@@ -289,6 +292,10 @@ def main():
                         help='Override project name')
     parser.add_argument('-b', '--branch', dest='obsbranch', action='store_true',
                         help="Work on the OBS branch (home:USERNAME:branches)")
+    parser.add_argument('-c', '--checkin', dest='checkin', action='store_true',
+                        help="On successful build, checkin to the OBS server")
+    parser.add_argument('-m', '--message', dest='msg',
+                        help="Use this message for checkin to the OBS server")
     parser.add_argument('cmd', metavar='cmd', type=str, default="",
                         help='|'.join(ls_commands()))
     parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
