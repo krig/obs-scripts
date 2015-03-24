@@ -137,6 +137,7 @@ def make_gitinfo(tmpdir, prefix):
 
 
 def mkarchive(projdir, projname, gitinfo=False):
+    rc = 0
     archivename = resolve_archive_name(projdir, projname)
     where = os.path.join(projdir, archivename)
     prefix, ext = os.path.splitext(archivename)
@@ -156,29 +157,30 @@ def mkarchive(projdir, projname, gitinfo=False):
             tmpdir = tempfile.mkdtemp()
             atexit.register(lambda: shutil.rmtree(tmpdir, ignore_errors=True))
         tarfile = os.path.join(tmpdir, prefix + '.tar')
-        do_call(['git', 'archive', '--format=tar', '--prefix=%s/' % (prefix),
+        rc = do_call(['git', 'archive', '--format=tar', '--prefix=%s/' % (prefix),
                  '-o', tarfile, 'HEAD'])
         if gitinfo:
             gitinfo_file = make_gitinfo(tmpdir, prefix)
             cwd = os.getcwd()
             do("cd %s" % (tmpdir), os.chdir, tmpdir)
-            do_call(['tar', '-rf', tarfile, gitinfo_file])
+            rc = rc | do_call(['tar', '-rf', tarfile, gitinfo_file])
             do("cd %s" % (cwd), os.chdir, cwd)
         zipcmd.append(tarfile)
-        do_call(zipcmd)
+        rc = rc | do_call(zipcmd)
         if VERBOSE:
             print "cp %s %s" % (tarfile + ext, where)
         if not DRYRUN:
             shutil.copyfile(tarfile + ext, where)
     elif os.path.isdir('.hg'):
         if ext in ['.bz2', '.tbz']:
-            do_call(['hg', 'archive', '-t', 'tbz2', where])
+            rc = rc | do_call(['hg', 'archive', '-t', 'tbz2', where])
         elif ext in ['.gz', '.tgz']:
-            do_call(['hg', 'archive', '-t', 'tgz', where])
+            rc = rc | do_call(['hg', 'archive', '-t', 'tgz', where])
         else:
             raise IOError("Unsupported compression: " + ext)
     else:
         raise IOError("not a git or mercurial repository: " + where)
+    return rc
 
 
 class Commands:
@@ -210,7 +212,7 @@ class Commands:
         self._setup_projname()
         d = os.path.join(self.buildservice, self.projname)
         self._checkdir(d)
-        mkarchive(d, self.projname, gitinfo=self.args.gitinfo)
+        return mkarchive(d, self.projname, gitinfo=self.args.gitinfo)
 
     def _cd_prj(self):
         self._setup_projname()
@@ -235,23 +237,25 @@ class Commands:
         cl += ['--root='+self.root]
         cl += [self.repo, self.arch]
         cl += ["%s.spec" % (self.projname)]
-        if do_call(cl) == 0 and self.args.checkin:
+        rc = do_call(cl)
+        if rc == 0 and self.args.checkin:
             cl = self.cmd.split()
             cl += ['ci', '-m', self.args.msg or '"new version"']
-            do_call(cl)
+            rc = do_call(cl)
+        return rc
 
     def run(self):
         self.clean()
         self.archive()
         self._cd_prj()
-        self.build()
+        return self.build()
 
     def test(self):
         self.args.tests = True
         self.clean()
         self.archive()
         self._cd_prj()
-        self.build()
+        return self.build()
 
     def help(self):
         pass
@@ -314,18 +318,20 @@ def main():
         if args.cmd == "help":
             parser.print_help()
         elif args.cmd in ls_commands():
-            getattr(commands, args.cmd)()
+            return getattr(commands, args.cmd)()
         else:
             print >>sys.stderr, "Unknown command ", args.cmd
             parser.print_help()
+            return 1
     except Exception, e:
         if VERBOSE:
             import traceback
             traceback.print_exc()
         print >>sys.stderr, "Error:", e
-        sys.exit(1)
+        return 1
 
 if __name__ == "__main__":
-    main()
+    rc = main()
+    sys.exit(rc)
 
 # vim:et:ts=4:
