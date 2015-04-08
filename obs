@@ -136,7 +136,7 @@ def make_gitinfo(tmpdir, prefix):
     return os.path.join(prefix, '.git_info')
 
 
-def mkarchive(projdir, projname, gitinfo=False):
+def mkarchive(projdir, projname, gitinfo=False, revision=""):
     rc = 0
     archivename = resolve_archive_name(projdir, projname)
     where = os.path.join(projdir, archivename)
@@ -158,7 +158,7 @@ def mkarchive(projdir, projname, gitinfo=False):
             atexit.register(lambda: shutil.rmtree(tmpdir, ignore_errors=True))
         tarfile = os.path.join(tmpdir, prefix + '.tar')
         rc = do_call(['git', 'archive', '--format=tar', '--prefix=%s/' % (prefix),
-                 '-o', tarfile, 'HEAD'])
+                 '-o', tarfile, revision or 'HEAD'])
         if gitinfo:
             gitinfo_file = make_gitinfo(tmpdir, prefix)
             cwd = os.getcwd()
@@ -173,11 +173,16 @@ def mkarchive(projdir, projname, gitinfo=False):
             shutil.copyfile(tarfile + ext, where)
     elif os.path.isdir('.hg'):
         if ext in ['.bz2', '.tbz']:
-            rc = rc | do_call(['hg', 'archive', '-t', 'tbz2', where])
+            comp = 'tbz2'
         elif ext in ['.gz', '.tgz']:
-            rc = rc | do_call(['hg', 'archive', '-t', 'tgz', where])
+            comp = 'tgz'
         else:
             raise IOError("Unsupported compression: " + ext)
+        cl = ['hg', 'archive', '-t', comp]
+        if revision:
+            cl += ['-r', revision]
+        cl += [where]
+        rc = rc | do_call(cl)
     else:
         raise IOError("not a git or mercurial repository: " + where)
     return rc
@@ -212,7 +217,8 @@ class Commands:
         self._setup_projname()
         d = os.path.join(self.buildservice, self.projname)
         self._checkdir(d)
-        return mkarchive(d, self.projname, gitinfo=self.args.gitinfo)
+        return mkarchive(d, self.projname,
+            gitinfo=self.args.gitinfo, revision=self.args.revision)
 
     def _cd_prj(self):
         self._setup_projname()
@@ -300,6 +306,8 @@ def main():
                         help="On successful build, checkin to the OBS server")
     parser.add_argument('-m', '--message', dest='msg',
                         help="Use this message for checkin to the OBS server")
+    parser.add_argument('-r', '--revision', dest='revision',
+                        help="Archive this revision instead of HEAD/tip")
     parser.add_argument('cmd', metavar='cmd', type=str, default="",
                         help='|'.join(ls_commands()))
     parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
