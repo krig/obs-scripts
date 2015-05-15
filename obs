@@ -207,11 +207,14 @@ class Commands:
             raise IOError("Not a directory: " + d)
 
     def variants(self):
-        for k, v in VARIANTS.iteritems():
-            print '[%s]' % (k)
-            for kk, vv in v.iteritems():
-                print "%15s = %s" % (kk, vv)
-            print
+        if VERBOSE:
+            for k, v in sorted(VARIANTS.items(), key=lambda v: v[0]):
+                print '[%s]' % (k)
+                for kk, vv in v.iteritems():
+                    print "%15s = %s" % (kk, vv)
+                print
+        else:
+            print '\n'.join(sorted(VARIANTS.keys()))
 
     def archive(self):
         self._setup_projname()
