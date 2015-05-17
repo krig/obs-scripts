@@ -17,6 +17,7 @@ from ConfigParser import RawConfigParser
 VARIANTS = {}
 VERBOSE = False
 DRYRUN = False
+DEFAULT_VARIANT = 'factory'
 
 variant_defaults = {
     "cmd": "osc",
@@ -99,6 +100,8 @@ def bsname(bdir, drop_pfx = None):
 
 
 def get_stdout(cmd):
+    if VERBOSE:
+        print(" ".join(cmd))
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
     outp = p.communicate()[0]
     return outp.strip()
@@ -191,7 +194,10 @@ def mkarchive(projdir, projname, gitinfo=False, revision=""):
 class Commands:
     def __init__(self, args):
         self.args = args
-        self.variant = VARIANTS[args.variant]
+        if self.args.cmd not in ('install',) and len(args.args) > 0:
+            self.variant = VARIANTS[args.args[0]]
+        else:
+            self.variant = VARIANTS[DEFAULT_VARIANT]
         for k, v in self.variant.iteritems():
             setattr(self, k, v)
         if args.projname:
@@ -280,7 +286,32 @@ class Commands:
                 do_call(['sudo', 'rm', fn])
 
     def install(self):
-        pass
+        args = self.args.args
+        if len(args) == 0:
+            print("Expected <package> or <repo>/<platform> [<package> ...]")
+            return 1
+        elif len(args) == 1:
+            return do_call(['sudo', 'zypper', 'in', args[0]])
+
+        repo, platform = args[0].rsplit('/', 1)
+        packages = args[1:]
+        bu = re.compile("^baseurl=(.*)$")
+        import glob
+        urls = []
+        for fn in glob.glob('/etc/zypp/repos.d/*.repo'):
+            for line in (bu.match(l.strip()) for l in open(fn)):
+                if line:
+                    urls.append(line.group(1))
+        repoobs = '%s/%s' % (repo, platform)
+        repourl = '/%s/%s/' % (repo.replace(':', ':/'), platform)
+        for u in urls:
+            if u.find(repourl) >= 0 or u.find(repoobs) >= 0:
+                return do_call(['sudo', 'zypper', 'in', '-r', u] + packages)
+        if do_call(['sudo', 'zypper', 'ar', '-c', 'obs://'+repoobs, repo]) != 0:
+            return 1
+        if do_call(['sudo', 'zypper', 'ref', repo]) != 0:
+            return 1
+        return do_call(['sudo', 'zypper', 'in', '-r', repo] + packages)
 
 
 def fuzzy_get(items, s):
@@ -347,8 +378,7 @@ def main():
                         help="Archive this revision instead of HEAD/tip")
     parser.add_argument('cmd', metavar='cmd', type=str, default="",
                         help='|'.join(ls_commands()))
-    parser.add_argument('variant', metavar='variant', nargs='?', type=str, default="factory",
-                        help='build variant')
+    parser.add_argument('args', metavar='args', nargs='*', help='command arguments')
     args = parser.parse_args()
 
     global VERBOSE
@@ -378,7 +408,7 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    rc = main()
+    rc = main() or 0
     sys.exit(rc)
 
 # vim:et:ts=4:
