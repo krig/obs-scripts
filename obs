@@ -279,6 +279,40 @@ class Commands:
             if os.path.isfile(fn):
                 do_call(['sudo', 'rm', fn])
 
+    def install(self):
+        pass
+
+
+def fuzzy_get(items, s):
+    """
+    Finds s in items using a fuzzy
+    matching algorithm:
+
+    1. if exact match, return value
+    2. if unique prefix, return value
+    3. if unique prefix substring, return value
+    """
+    if s in items:
+        return s
+    import re
+
+    def fuzzy_match(rx):
+        matcher = re.compile(rx, re.I)
+        matches = [m for m in items if matcher.match(m)]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    # prefix match
+    m = fuzzy_match(s + '.*')
+    if m:
+        return m
+    # substring match
+    m = fuzzy_match('.*'.join(s) + '.*')
+    if m:
+        return m
+    return None
+
 
 def main():
     def ls_commands():
@@ -328,8 +362,10 @@ def main():
         commands = Commands(args)
         if args.cmd == "help":
             parser.print_help()
-        elif args.cmd in ls_commands():
-            return getattr(commands, args.cmd)()
+            return 0
+        cmd = fuzzy_get(ls_commands(), args.cmd)
+        if cmd is not None:
+            return getattr(commands, cmd)()
         else:
             print >>sys.stderr, "Unknown command ", args.cmd
             parser.print_help()
