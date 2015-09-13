@@ -43,7 +43,9 @@ def resolve_archive_name(projdir, projname):
             srcl = srcl[0]
             srcl = srcl.replace("%{name}", projname)
             srcl = srcl.replace("%{version}", verl)
-            return srcl
+            if srcl.startswith('http://') or srcl.startswith('https://'):
+                srcl = os.path.basename(srcl)
+        return srcl
     else:
         return "%s.tar.bz2" % (projname)
 
