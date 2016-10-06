@@ -15,6 +15,9 @@ class Entry(object):
     def hash(self):
         hash(self.join())
 
+    def body(self):
+        return "".join(self.lines[1:])
+
     def join(self):
         return "".join(self.lines)
 
@@ -51,7 +54,17 @@ def merge(entries1, entries2):
     for e in entries1:
         h = e.hash()
         entries2 = [f for f in entries2 if e.tstamp != f.tstamp or f.hash() != h]
-    entries = [f for f in entries1]
+    entries = []
+    for f in entries1:
+        keep = True
+        fh = f.body()
+        for g in entries2:
+            gh = g.body()
+            if fh == gh:
+                if g.tstamp > f.tstamp:
+                    keep = False
+        if keep:
+            entries.append(f)
     entries.extend(entries2)
     entries.sort(key=lambda e: e.tstamp)
     entries.reverse()
