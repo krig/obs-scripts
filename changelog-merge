@@ -1,0 +1,68 @@
+#!/usr/bin/python
+from __future__ import print_function
+import sys
+import re
+from dateutil.parser import parse
+
+
+class Entry(object):
+    def __init__(self, filenum, fileindex):
+        self.lines = []
+        self.filenum = filenum
+        self.fileindex = fileindex
+        self.tstamp = None
+
+    def hash(self):
+        hash(self.join())
+
+    def join(self):
+        return "".join(self.lines)
+
+
+def scanlines(f1, f2):
+    entries1 = []
+    entries2 = []
+    def scanlines(tgt, f, fileidx):
+        curr = None
+        curridx = 0
+        for line in f.readlines():
+            if re.match(r'^-+$', line.strip()):
+                if curr is not None:
+                    tgt.append(curr)
+                    curr = None
+                curr = Entry(0, curridx)
+                curridx += 1
+            if curr is not None:
+                curr.lines.append(line)
+            if curr is not None and curr.tstamp is None:
+                m = re.match(r'^(.*)\s+-\s+.*', line)
+                if m:
+                    curr.tstamp = parse(m.group(1))
+        if curr is not None:
+            if curr.tstamp is None:
+                print("Entry {}:{} has no timestamp".format(curr.filenum, curr.fileindex))
+            tgt.append(curr)
+            curr = None
+    scanlines(entries1, f1, 1)
+    scanlines(entries2, f2, 2)
+    return entries1, entries2
+
+def merge(entries1, entries2):
+    for e in entries1:
+        h = e.hash()
+        entries2 = [f for f in entries2 if e.tstamp != f.tstamp or f.hash() != h]
+    entries = [f for f in entries1]
+    entries.extend(entries2)
+    entries.sort(key=lambda e: e.tstamp)
+    entries.reverse()
+    for e in entries:
+        print(e.join(), end="")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: {} <changelog1> <changelog2>".format(sys.argv[0]), file=sys.stderr)
+        sys.exit(1)
+    with open(sys.argv[1], "rt") as log1:
+        with open(sys.argv[2], "rt") as log2:
+            entries1, entries2 = scanlines(log1, log2)
+            merge(entries1, entries2)
