@@ -4,16 +4,13 @@ import tempfile
 import re
 import sys
 import shutil
-import json
-import urllib.request
-import urllib.error
-from functools import lru_cache
+import configparser
 import sh
+from . import common
 
 
 # update rook to a newer version
 
-BRANCHBASE = "home:KGronlund:branches:{}"
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
 LATEST_OCTOPUS = "v1.1.7"
@@ -24,8 +21,7 @@ IBS = "https://api.suse.de"
 
 OOSC = sh.osc.bake(A=OBS)
 IOSC = sh.osc.bake(A=IBS)
-
-GITHUB_RELEASE_TAG = "https://api.github.com/repos/{srcrepo}/releases/tags/{tag}"
+BRANCHBASE = common.obs_branchbase(OBS)
 
 PROJECTS = {
     "filesystems:ceph": {
@@ -43,20 +39,18 @@ PROJECTS = {
     "filesystems:ceph:master:upstream": {
         "cmd": OOSC,
         "version-tag": LATEST_OCTOPUS
-    },
-    "Devel:Storage:6.0": {
-        "cmd": IOSC,
-        "version-tag": LATEST_NAUTILUS
-    },
-    "Devel:Storage:7.0": {
-        "cmd": IOSC,
-        "version-tag": LATEST_OCTOPUS
     }
 }
 
-def query_json(url):
-    with urllib.request.urlopen(url) as response:
-        return json.load(response)
+def oscrc_username(api):
+    locations = (os.path.expanduser("~/.config/osc/oscrc"),
+                 os.path.expanduser("~/.oscrc"))
+    for loc in locations:
+        if os.path.isfile(loc):
+            cfg = configparser.ConfigParser()
+            cfg.read(loc)
+            return cfg[api]["user"]
+
 
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
@@ -69,14 +63,8 @@ def update_tarball(tgtversion):
     shutil.copyfile(filename, "update-tarball.sh")
     os.remove(filename)
 
-
-@lru_cache(maxsize=32)
-def fetch_changelog(tgtversion):
-    print("Fetching changelog for {} from github...".format(tgtversion))
-    return query_json(GITHUB_RELEASE_TAG.format(srcrepo=SRCREPO, tag=tgtversion))
-
 def update_changelog(osc, tgtversion):
-    changes = fetch_changelog(tgtversion)
+    changes = common.fetch_github_tag(SRCREPO, tgtversion)
     txt = changes["body"]
     txt = txt.replace("\r", "")
     txt = re.sub(r', @\w+', '', txt)
