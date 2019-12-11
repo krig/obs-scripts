@@ -90,6 +90,7 @@ def update_changelog(osc, tgtversion):
     os.remove(filename)
 
 def main():
+    nupdated = 0
     if os.path.exists("wip"):
         print("In-progress commits detected: wip/ exists. Please resolve manually.")
         sys.exit(1)
@@ -120,13 +121,15 @@ def main():
             print(sh.sh("./update-tarball.sh"))
             print(osc.ar())
             print(osc.commit("-m", "Update to version {}:".format(proj["version-tag"])))
+            nupdated = nupdated + 1
 
         except Exception as err:
             raise err
         finally:
             os.chdir(curr)
 
-    print("Updated projects now in:\nwip")
+    if nupdated > 0:
+        print("{} updated projects now in:\nwip".format(nupdated))
 
 if __name__ == "__main__":
     main()
