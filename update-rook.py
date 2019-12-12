@@ -42,16 +42,6 @@ PROJECTS = {
     }
 }
 
-def oscrc_username(api):
-    locations = (os.path.expanduser("~/.config/osc/oscrc"),
-                 os.path.expanduser("~/.oscrc"))
-    for loc in locations:
-        if os.path.isfile(loc):
-            cfg = configparser.ConfigParser()
-            cfg.read(loc)
-            return cfg[api]["user"]
-
-
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
     txt = open("update-tarball.sh").read().decode('utf-8')
