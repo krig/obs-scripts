@@ -6,7 +6,7 @@ import sys
 import shutil
 import configparser
 import sh
-from . import common
+import obsscripts
 
 
 # update rook to a newer version
@@ -21,7 +21,7 @@ IBS = "https://api.suse.de"
 
 OOSC = sh.osc.bake(A=OBS)
 IOSC = sh.osc.bake(A=IBS)
-BRANCHBASE = common.obs_branchbase(OBS)
+BRANCHBASE = obsscripts.obs_branchbase(OBS)
 
 PROJECTS = {
     "filesystems:ceph": {
@@ -54,7 +54,7 @@ def update_tarball(tgtversion):
     os.remove(filename)
 
 def update_changelog(osc, tgtversion):
-    changes = common.fetch_github_tag(SRCREPO, tgtversion)
+    changes = obsscripts.fetch_github_tag(SRCREPO, tgtversion)
     txt = changes["body"]
     txt = txt.replace("\r", "")
     txt = re.sub(r', @\w+', '', txt)
@@ -89,7 +89,10 @@ def main():
         curr = os.getcwd()
         try:
             wip = os.path.join(curr, "wip")
-            os.mkdir(wip)
+            try:
+                os.mkdir(wip)
+            except os.error:
+                pass
             os.chdir(wip)
             osc("bco", repo, PACKAGE)
             os.chdir(os.path.join(wip, BRANCHBASE.format(repo), PACKAGE))
@@ -101,8 +104,6 @@ def main():
             print(osc.commit("-m", "Update to version {}:".format(proj["version-tag"])))
             nupdated = nupdated + 1
 
-        except Exception as err:
-            raise err
         finally:
             os.chdir(curr)
 
