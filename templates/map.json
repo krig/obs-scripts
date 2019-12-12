@@ -1,11 +1,35 @@
 {
     "images": ["ceph-image", "ceph-csi-image", "rook-ceph-image"],
     "repositories": {
-        "obs://filesystems:ceph": "tumbleweed",
-        "obs://filesystems:ceph:nautilus": "leap15_1",
-        "obs://filesystems:ceph:octopus": "leap15_2",
-        "obs://filesystems:ceph:upstream:master": "leap15_2",
-        "ibs://Devel:Storage:6.0": "ses6",
-        "ibs://Devel:Storage:7.0": "ses7"
+        "obs://filesystems:ceph": {
+            "variant": "tumbleweed",
+            "registry": "registry.opensuse.org",
+            "name_prefix": "/"
+        },
+        "obs://filesystems:ceph:nautilus": {
+            "variant": "leap15_1",
+            "registry": "registry.opensuse.org",
+            "name_prefix": "/filesystems/ceph/nautilus/images/"
+        },
+        "obs://filesystems:ceph:octopus": {
+            "variant": "leap15_2",
+            "registry": "registry.opensuse.org",
+            "name_prefix": "/filesystems/ceph/octopus/images/"
+        },
+        "obs://filesystems:ceph:master:upstream": {
+            "variant": "leap15_2",
+            "registry": "registry.opensuse.org",
+            "name_prefix": "/filesystems/ceph/master/upstream/images/"
+        },
+        "ibs://Devel:Storage:6.0": {
+            "variant": "ses6",
+            "registry": "registry.suse.com",
+            "name_prefix": "/"
+        },
+        "ibs://Devel:Storage:7.0": {
+            "variant": "ses7",
+            "registry": "registry.suse.com",
+            "name_prefix": "/"
+        }
     }
 }

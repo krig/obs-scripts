@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <param>
-  <image>obsrepositories:/filesystems/ceph/nautilus/images/ceph/ceph#leap15.1.nautilus</image>
+  <image>obsrepositories:/ceph/ceph#leap15.1.nautilus</image>
   <tags>leap15.1.nautilus</tags>
   <name>rook/ceph</name>
   <prefix>org.opensuse.rook-ceph</prefix>
   <title>Rook container for Ceph</title>
-  <url>https://registry.opensuse.org/filesystems/ceph/nautilus/images/rook/ceph:%PKG_VERSION%.%PKG_COMMIT_NUM%.%RELEASE%</url>
-  <reference>registry.opensuse.org/filesystems/ceph/nautilus/images/rook/ceph:%PKG_VERSION%.%PKG_COMMIT_NUM%.%RELEASE%</reference>
+  <url>https://registry.opensuse.org/rook/ceph:%PKG_VERSION%.%PKG_COMMIT_NUM%.%RELEASE%</url>
+  <reference>registry.opensuse.org/rook/ceph:%PKG_VERSION%.%PKG_COMMIT_NUM%.%RELEASE%</reference>
   <packages_image>
     <package>
       <name>openSUSE-build-key</name>

@@ -19,7 +19,7 @@ IOSC = sh.osc.bake(A=IBS)
 BRANCHBASE = obsscripts.obs_branchbase(OBS)
 
 
-def update_repo(name, repo, variant):
+def update_repo(name, repo, variant, registry, prefix):
     """
     1. generate the kiwi file
     2. pull down kiwi file from server
@@ -47,12 +47,14 @@ def update_repo(name, repo, variant):
         rq = sh.xsltproc(os.path.join(tmpl_dir, name, "{}.xsl".format(name)),
                          os.path.join(tmpl_dir, name, "{}.xml".format(variant)))
         new_kiwi = rq.stdout.decode('utf-8')
+        new_kiwi = new_kiwi.replace("{}/".format(registry), "{}{}".format(registry, prefix))
+        new_kiwi = new_kiwi.replace("obsrepositories:/ceph/ceph", "obsrepositories:{}ceph/ceph".format(prefix))
         if curr_kiwi == new_kiwi:
             print("Skipping {}/{}: no difference".format(repo, name))
             return
     except sh.ErrorReturnCode as err:
         print(err)
-        print("Skipping {}/{}...".format(err.exit_code, repo, name))
+        print("Skipping {}/{}...".format(repo, name))
         return
 
     try:
@@ -65,6 +67,11 @@ def update_repo(name, repo, variant):
         os.chdir(os.path.join(wip_dir, BRANCHBASE.format(repo), name))
         with open("{}.kiwi".format(name), "w") as f:
             f.write(new_kiwi)
+        # copy updated template files as well
+        for f in os.listdir(os.path.join(tmpl_dir, name)):
+            shutil.copyfile(os.path.join(tmpl_dir, name, f),
+                            os.path.join(wip_dir, BRANCHBASE.format(repo), name, f))
+        osc.ar()
     finally:
         os.chdir(curr)
 
@@ -79,8 +86,11 @@ def main():
     cfg = json.load(open(os.path.join(TEMPLATES_DIR, MAP_FILE)))
 
     for image in cfg["images"]:
-        for repo, variant in cfg["repositories"].items():
-            update_repo(image, repo, variant)
+        for repo, data in cfg["repositories"].items():
+            variant = data["variant"]
+            registry = data["registry"]
+            prefix = data["name_prefix"]
+            update_repo(image, repo, variant, registry, prefix)
 
 if __name__ == "__main__":
     main()
