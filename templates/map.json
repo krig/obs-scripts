@@ -1,0 +1,11 @@
+{
+    "images": ["ceph-image", "ceph-csi-image", "rook-ceph-image"],
+    "repositories": {
+        "obs://filesystems:ceph": "tumbleweed",
+        "obs://filesystems:ceph:nautilus": "leap15_1",
+        "obs://filesystems:ceph:octopus": "leap15_2",
+        "obs://filesystems:ceph:upstream:master": "leap15_2",
+        "ibs://Devel:Storage:6.0": "ses6",
+        "ibs://Devel:Storage:7.0": "ses7"
+    }
+}
