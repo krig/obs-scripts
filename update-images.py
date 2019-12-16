@@ -40,10 +40,18 @@ def update_repo(name, repo, variant, registry, prefix):
     wip_dir = os.path.join(curr, "wip")
     tmpl_dir = os.path.join(curr, TEMPLATES_DIR)
 
+    curr_kiwi = None
     new_kiwi = None
     try:
         rq = osc.api("-X", "GET", "/source/{0}/{1}/{1}.kiwi".format(repo, name))
         curr_kiwi = rq.stdout.decode('utf-8')
+    except sh.ErrorReturnCode as err:
+        #print(err)
+        #print("Skipping {}/{}...".format(repo, name))
+        #return
+        pass
+
+    try:
         rq = sh.xsltproc(os.path.join(tmpl_dir, name, "{}.xsl".format(name)),
                          os.path.join(tmpl_dir, name, "{}.xml".format(variant)))
         new_kiwi = rq.stdout.decode('utf-8')
@@ -72,6 +80,12 @@ def update_repo(name, repo, variant, registry, prefix):
             shutil.copyfile(os.path.join(tmpl_dir, name, f),
                             os.path.join(wip_dir, BRANCHBASE.format(repo), name, f))
         osc.ar()
+        try:
+            msg = sys.argv[sys.argv.index("-m") + 1]
+            osc.commit("-m", msg)
+            osc.sr("-m", msg)
+        except ValueError as err:
+            pass
     finally:
         os.chdir(curr)
 
