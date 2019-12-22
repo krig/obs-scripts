@@ -9,17 +9,17 @@
         "obs://filesystems:ceph:nautilus": {
             "variant": "leap15_1",
             "registry": "registry.opensuse.org",
-            "name_prefix": "/filesystems/ceph/nautilus/images/"
+            "name_prefix": "/"
         },
         "obs://filesystems:ceph:octopus": {
             "variant": "leap15_2",
             "registry": "registry.opensuse.org",
-            "name_prefix": "/filesystems/ceph/octopus/images/"
+            "name_prefix": "/"
         },
         "obs://filesystems:ceph:master:upstream": {
-            "variant": "leap15_2",
+            "variant": "upstream",
             "registry": "registry.opensuse.org",
-            "name_prefix": "/filesystems/ceph/master/upstream/images/"
+            "name_prefix": "/"
         },
         "ibs://Devel:Storage:6.0": {
             "variant": "ses6",

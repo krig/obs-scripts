@@ -101,6 +101,9 @@ def main():
 
     for image in cfg["images"]:
         for repo, data in cfg["repositories"].items():
+            if data.get("disabled") == "true":
+                print("{} disabled, skipping...".format(repo))
+                continue
             variant = data["variant"]
             registry = data["registry"]
             prefix = data["name_prefix"]
