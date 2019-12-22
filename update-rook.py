@@ -13,8 +13,8 @@ import obsscripts
 
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
-LATEST_OCTOPUS = "v1.1.7"
-LATEST_NAUTILUS = "v1.1.7"
+LATEST_OCTOPUS = "v1.2.0"
+LATEST_NAUTILUS = "v1.2.0"
 
 OBS = "https://api.opensuse.org"
 IBS = "https://api.suse.de"
@@ -44,7 +44,7 @@ PROJECTS = {
 
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
-    txt = open("update-tarball.sh").read().decode('utf-8')
+    txt = open("update-tarball.sh", "r").read()
     f, filename = tempfile.mkstemp('.sh', text=True)
     tf = os.fdopen(f, "w")
     txt = re.sub('ROOK_REV="[^"]+"', 'ROOK_REV="{}"'.format(tgtversion), txt, count=1)
