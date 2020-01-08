@@ -4,7 +4,7 @@ import tempfile
 import re
 import sys
 import shutil
-import configparser
+import glob
 import sh
 import obsscripts
 
@@ -42,6 +42,7 @@ PROJECTS = {
     }
 }
 
+
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
     txt = open("update-tarball.sh", "r").read()
@@ -53,6 +54,7 @@ def update_tarball(tgtversion):
     shutil.copyfile(filename, "update-tarball.sh")
     os.remove(filename)
 
+
 def update_changelog(osc, tgtversion):
     f, filename = tempfile.mkstemp('.txt', text=True)
     tf = os.fdopen(f, "w")
@@ -60,6 +62,7 @@ def update_changelog(osc, tgtversion):
     tf.close()
     osc.vc("-F", filename)
     os.remove(filename)
+
 
 def fetch_changelog(osc, tgtversion, tofile):
     """
@@ -116,7 +119,9 @@ def main():
             os.chdir(os.path.join(wip, BRANCHBASE.format(repo), PACKAGE))
             update_changelog(osc, proj["version-tag"])
             update_tarball(proj["version-tag"])
-            sh.rm("-rf", "rook-*.tar.xz")
+            for toremove in glob.glob('./rook-*.xz'):
+                print("Deleting {}...".format(toremove))
+                os.remove(toremove)
             print(sh.sh("./update-tarball.sh"))
             print(osc.ar())
             print(osc.commit("-m", "Update to version {}:".format(proj["version-tag"])))
@@ -127,6 +132,7 @@ def main():
 
     if nupdated > 0:
         print("{} updated projects now in:\nwip".format(nupdated))
+
 
 if __name__ == "__main__":
     main()
