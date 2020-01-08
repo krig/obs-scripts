@@ -13,8 +13,8 @@ import obsscripts
 
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
-LATEST_OCTOPUS = "v1.2.0"
-LATEST_NAUTILUS = "v1.2.0"
+LATEST_OCTOPUS = "v1.2.1"
+LATEST_NAUTILUS = "v1.2.1"
 
 OBS = "https://api.opensuse.org"
 IBS = "https://api.suse.de"
@@ -54,18 +54,27 @@ def update_tarball(tgtversion):
     os.remove(filename)
 
 def update_changelog(osc, tgtversion):
-    changes = obsscripts.fetch_github_tag(SRCREPO, tgtversion)
-    txt = changes["body"]
-    txt = txt.replace("\r", "")
-    txt = re.sub(r', @\w+', '', txt)
     f, filename = tempfile.mkstemp('.txt', text=True)
     tf = os.fdopen(f, "w")
-    tf.write("- Update to {}:".format(tgtversion))
-    for line in txt.splitlines():
-        if line.startswith('- '):
-            tf.write("  *{}".format(line[2:]))
+    fetch_changelog(osc, tgtversion, tf)
+    tf.close()
     osc.vc("-F", filename)
     os.remove(filename)
+
+def fetch_changelog(osc, tgtversion, tofile):
+    """
+    Pull changes, write them into tofile
+    """
+    changes = obsscripts.fetch_github_tag(SRCREPO, tgtversion)
+    txt = changes["body"]
+    print("Raw changes:\n{}\n".format(txt))
+    txt = txt.replace("\r", "")
+    txt = re.sub(r', @\w+', '', txt)
+    tofile.write("- Update to {}:\n".format(tgtversion))
+    for line in txt.splitlines():
+        if line.startswith('- ') or line.startswith('* '):
+            tofile.write("  *{}\n".format(line[2:]))
+
 
 def main():
     nupdated = 0
@@ -75,6 +84,15 @@ def main():
 
     for repo, proj in PROJECTS.items():
         osc = proj["cmd"]
+
+        if "--fetch-changes" in sys.argv:
+            f, filename = tempfile.mkstemp('.txt', text=True)
+            tf = os.fdopen(f, "w")
+            fetch_changelog(osc, proj["version-tag"], tf)
+            tf.close()
+            print(open(filename).read())
+            os.remove(filename)
+            sys.exit(0)
 
         try:
             tarball = osc.api("-X", "GET", "/source/{}/{}/update-tarball.sh".format(repo, PACKAGE))
