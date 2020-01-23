@@ -42,6 +42,14 @@ PROJECTS = {
     }
 }
 
+PROJECTS_IBS = {
+    "Devel:Storage:7.0": {
+        "cmd": IOSC,
+        "version-tag": LATEST_OCTOPUS
+    }
+}
+
+PROJECTS = PROJECTS_IBS
 
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
