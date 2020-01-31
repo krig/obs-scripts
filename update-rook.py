@@ -13,8 +13,8 @@ import obsscripts
 
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
-LATEST_OCTOPUS = "v1.2.1"
-LATEST_NAUTILUS = "v1.2.1"
+LATEST_OCTOPUS = "v1.2.2"
+LATEST_NAUTILUS = "v1.2.2"
 
 OBS = "https://api.opensuse.org"
 IBS = "https://api.suse.de"
@@ -49,7 +49,8 @@ PROJECTS_IBS = {
     }
 }
 
-PROJECTS = PROJECTS_IBS
+#PROJECTS = PROJECTS_IBS
+PROJECTS.update(PROJECTS_IBS)
 
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
@@ -84,7 +85,7 @@ def fetch_changelog(osc, tgtversion, tofile):
     tofile.write("- Update to {}:\n".format(tgtversion))
     for line in txt.splitlines():
         if line.startswith('- ') or line.startswith('* '):
-            tofile.write("  *{}\n".format(line[2:]))
+            tofile.write("  * {}\n".format(line[2:]))
 
 
 def main():
