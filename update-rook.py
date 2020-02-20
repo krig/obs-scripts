@@ -13,8 +13,8 @@ import obsscripts
 
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
-LATEST_OCTOPUS = "v1.2.2"
-LATEST_NAUTILUS = "v1.2.2"
+LATEST_OCTOPUS = "v1.2.4"
+LATEST_NAUTILUS = "v1.2.4"
 
 OBS = "https://api.opensuse.org"
 IBS = "https://api.suse.de"
@@ -50,7 +50,7 @@ PROJECTS_IBS = {
 }
 
 #PROJECTS = PROJECTS_IBS
-PROJECTS.update(PROJECTS_IBS)
+#PROJECTS.update(PROJECTS_IBS)
 
 def update_tarball(tgtversion):
     print("Editing update-tarball.sh...")
@@ -68,6 +68,15 @@ def update_changelog(osc, tgtversion):
     f, filename = tempfile.mkstemp('.txt', text=True)
     tf = os.fdopen(f, "w")
     fetch_changelog(osc, tgtversion, tf)
+    tf.close()
+    osc.vc("-F", filename)
+    os.remove(filename)
+
+
+def update_changelog_with_message(osc, msg):
+    f, filename = tempfile.mkstemp('.txt', text=True)
+    tf = os.fdopen(f, "w")
+    tf.write("- {}\n".format(msg))
     tf.close()
     osc.vc("-F", filename)
     os.remove(filename)
@@ -94,8 +103,16 @@ def main():
         print("In-progress commits detected: wip/ exists. Please resolve manually.")
         sys.exit(1)
 
+    override_commit = None
+    if "--override" in sys.argv:
+        override_commit = sys.argv[sys.argv.index("--override") + 1]
+
+    if "-m" in sys.argv:
+        override_msg = sys.argv[sys.argv.index("-m") + 1]
+
     for repo, proj in PROJECTS.items():
         osc = proj["cmd"]
+        commit = override_commit or proj["version-tag"]
 
         if "--fetch-changes" in sys.argv:
             f, filename = tempfile.mkstemp('.txt', text=True)
@@ -109,13 +126,13 @@ def main():
         try:
             tarball = osc.api("-X", "GET", "/source/{}/{}/update-tarball.sh".format(repo, PACKAGE))
             m = re.search('ROOK_REV="(.+)"', tarball.stdout.decode('utf-8'))
-            if m and m.group(1) == proj["version-tag"]:
+            if m and m.group(1) == commit:
                 continue
         except sh.ErrorReturnCode as err:
             print("Error code {}, skipping {}/{}...".format(err.exit_code, repo, PACKAGE))
             continue
 
-        print("Updating {}/{} to version {}...".format(repo, PACKAGE, proj["version-tag"]))
+        print("Updating {}/{} to version {}...".format(repo, PACKAGE, commit))
         curr = os.getcwd()
         try:
             wip = os.path.join(curr, "wip")
@@ -126,14 +143,18 @@ def main():
             os.chdir(wip)
             osc("bco", repo, PACKAGE)
             os.chdir(os.path.join(wip, BRANCHBASE.format(repo), PACKAGE))
-            update_changelog(osc, proj["version-tag"])
-            update_tarball(proj["version-tag"])
+            if proj["version-tag"] == commit:
+                update_changelog(osc, proj["version-tag"])
+            else:
+                update_changelog_with_message(
+                    osc, override_msg or "Update to commit {}".format(commit))
+            update_tarball(commit)
             for toremove in glob.glob('./rook-*.xz'):
                 print("Deleting {}...".format(toremove))
                 os.remove(toremove)
             print(sh.sh("./update-tarball.sh"))
             print(osc.ar())
-            print(osc.commit("-m", "Update to version {}:".format(proj["version-tag"])))
+            print(osc.commit("-m", "Update to version {}:".format(commit)))
             nupdated = nupdated + 1
 
         finally:
