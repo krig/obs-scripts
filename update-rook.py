@@ -13,8 +13,8 @@ import obsscripts
 
 PACKAGE = "rook"
 SRCREPO = "rook/rook"
-LATEST_OCTOPUS = "v1.2.4"
-LATEST_NAUTILUS = "v1.2.4"
+LATEST_OCTOPUS = "v1.2.7"
+LATEST_NAUTILUS = "v1.2.7"
 
 OBS = "https://api.opensuse.org"
 IBS = "https://api.suse.de"
